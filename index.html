@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>campeonato mundial de fxracer</title>
+    <!-- PWA manifest -->
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="theme-color" content="#000000">
+    <!-- Favicon: añadimos /favicon.ico para evitar 404 en servidores que piden esa ruta -->
+    <link rel="shortcut icon" href="/favicon.ico">
+    <link rel="icon" href="favicon.ico" type="image/x-icon">
+    <!-- PNG favicon (mejor compatibilidad) -->
+    <link rel="icon" href="favicon.png" type="image/png">
+    <!-- Fallbacks: SVG icon (existing) -->
+    <link rel="icon" href="logo.svg" type="image/svg+xml">
+        <style>
+            :root{font-family:Segoe UI,Roboto,Arial,sans-serif;color:#fff}
+            /* Fondo tipo F1: ruta relativa (funciona en GitHub Pages, servidor local y escritorio) */
+            body{
+                max-width:980px;margin:28px auto;padding:18px;
+                background: linear-gradient(rgba(0,0,0,0.35), rgba(0,0,0,0.35)), url('f1-background.jpg') center/cover no-repeat;
+                /* fallback if not present */
+                background-color: #0b0b0b;
+                color: #fff;
+            }
+            h1{margin:0 0 10px}
+            .container{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+            /* Tarjetas/transparencias: hacer la 'tabla de puntos' transparente */
+            .card{border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:12px;background:rgba(0,0,0,0.45);color:#fff}
+            /* Inputs translúcidos para verse sobre el fondo */
+            .inputs .row input[type=text]{flex:1;padding:6px;border:1px solid rgba(255,255,255,0.12);border-radius:4px;background:rgba(255,255,255,0.06);color:#fff}
+            input[type=number]{width:80px;min-width:72px;padding:6px;border:1px solid rgba(255,255,255,0.12);border-radius:4px;background:rgba(255,255,255,0.06);color:#fff}
+            label{font-size:13px;width:110px;color:rgba(255,255,255,0.9)}
+            .inputs{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+            .inputs .row{display:flex;gap:8px;align-items:center}
+            .inputs .row input[type=text]{flex:1;padding:6px;border:1px solid #ccc;border-radius:4px}
+            .inputs .row img.logo{width:36px;height:24px;object-fit:contain;border-radius:4px;margin-right:8px}
+            .row.champion{outline:3px solid gold;border-radius:6px}
+            .champion-badge{background:gold;color:#111;padding:2px 6px;border-radius:12px;font-weight:700;margin-left:8px;font-size:12px}
+            .position{width:36px;text-align:center;font-weight:700;margin-right:6px}
+            label{font-size:13px;width:110px}
+            input[type=number]{width:80px;min-width:72px;padding:6px;border:1px solid #ccc;border-radius:4px}
+            .totals{margin-top:12px;display:flex;gap:12px;align-items:center}
+            .total-box{background:#fff;border:1px solid #ccc;padding:10px;border-radius:6px;min-width:140px;text-align:center}
+            .actions{margin-top:12px;display:flex;gap:8px}
+            button{padding:8px 10px;border-radius:6px;border:1px solid #2b6;cursor:pointer;background:#2e8b57;color:#fff}
+            button.secondary{background:#666;border-color:#444}
+            footer{margin-top:20px;font-size:13px;color:#555}
+            @media(max-width:720px){.container{grid-template-columns:1fr}.inputs{grid-template-columns:1fr}}
+        </style>
+    </head>
+    <body>
+        <!-- Caja de depuración visible si hay errores -->
+        <div id="debug" style="background:#ffecec;border:1px solid #ffb6b6;padding:8px;border-radius:6px;margin-bottom:12px;display:none;color:#900"></div>
+    <h1>campeonato mundial de fxracer</h1>
+        <p>Rellena los puntos de cada piloto (22) y de cada constructor (11). Los totales se actualizan automáticamente.</p>
+
+        <div class="container">
+            <section class="card" aria-labelledby="pilotos-title">
+                <h2 id="pilotos-title">Pilotos (22)</h2>
+                <form id="pilotos-form" onsubmit="return false;">
+                    <div class="inputs" id="pilotos-inputs">
+                        <!-- 22 filas (nombre + puntos) generadas por JavaScript -->
+                    </div>
+                    <div class="actions">
+                        <button id="reset-pilotos" type="button" class="secondary">Reset Pilotos</button>
+                        <button id="auto-champion-pilotos" type="button">Marcar campeón automático</button>
+                    </div>
+                </form>
+            </section>
+
+            <section class="card" aria-labelledby="constructores-title">
+                <h2 id="constructores-title">Constructores (11)</h2>
+                <form id="constructores-form" onsubmit="return false;">
+                    <div class="inputs" id="constructores-inputs">
+                        <!-- 11 filas (nombre + puntos) generadas por JavaScript -->
+                    </div>
+                    <div class="actions">
+                        <button id="reset-constructores" type="button" class="secondary">Reset Constructores</button>
+                        <button id="auto-champion-constructores" type="button">Marcar campeón automático</button>
+                    </div>
+                </form>
+            </section>
+        </div>
+
+        <div style="margin-top:18px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <div style="display:flex;gap:8px">
+                <button id="copiar-resultados" type="button">Copiar listado</button>
+                <button id="reset-todo" type="button" class="secondary">Reset Todo</button>
+            </div>
+        </div>
+
+        <!-- Sección Calendario de 25 Grand Prix -->
+        <section class="card" style="margin-top:20px">
+            <h2>Calendario 2025 (25 Grand Prix)</h2>
+            <table style="width:100%;border-collapse:collapse;font-size:14px">
+                <thead>
+                    <tr style="background:rgba(255,255,255,0.1)">
+                        <th style="border:1px solid rgba(255,255,255,0.2);padding:8px;text-align:left">Posición</th>
+                        <th style="border:1px solid rgba(255,255,255,0.2);padding:8px;text-align:left">Gran Premio</th>
+                        <th style="border:1px solid rgba(255,255,255,0.2);padding:8px;text-align:center;width:120px">Fecha</th>
+                        <th style="border:1px solid rgba(255,255,255,0.2);padding:8px;text-align:center;width:80px">Ganador</th>
+                    </tr>
+                </thead>
+                <tbody id="calendar-tbody">
+                    <!-- Las filas se generarán con JavaScript -->
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Update toast (hidden by default) -->
+        <div id="update-toast" style="position:fixed;right:16px;bottom:16px;background:rgba(0,0,0,0.7);color:#fff;padding:10px 12px;border-radius:8px;display:none;align-items:center;gap:8px;z-index:9999">
+            <span>Actualización disponible</span>
+            <button id="update-reload" style="background:gold;color:#000;border:none;padding:6px 8px;border-radius:6px;cursor:pointer">Recargar</button>
+        </div>
+
+        <footer>
+            Consejo: deja los casilleros en blanco o con 0 si no hay puntos.
+        </footer>
+
+        <script>
+            // Mostrar mensajes de depuración en la página para ayudar al usuario
+            function showDebug(msg){
+                const d = document.getElementById('debug');
+                if(!d) return;
+                d.style.display = 'block';
+                d.textContent = msg;
+            }
+            window.addEventListener('error', function(e){
+                showDebug('Error: ' + (e.message || e.error || e));
+            });
+            window.addEventListener('unhandledrejection', function(e){
+                showDebug('Unhandled promise rejection: ' + (e.reason && e.reason.message ? e.reason.message : e.reason));
+            });
+
+            // Configuración: número de casilleros
+            const NUM_PILOTOS = 22;
+            const NUM_CONSTRUCTORES = 11;
+
+                    // createInputs ahora acepta un argumento opcional extra (extras)
+                    // extras puede ser un array con ids de logo (para constructores)
+                    function createInputs(containerId, prefix, count, className, extras){
+                        const container = document.getElementById(containerId);
+                        for(let i=1;i<=count;i++){
+                            const row = document.createElement('div');
+                            row.className = 'row';
+
+                            // si extras está presente y hay un id, crear <img> de logo
+                            if(Array.isArray(extras) && extras[i-1]){
+                                const logoId = extras[i-1];
+                                const img = document.createElement('img');
+                                img.className = 'logo';
+                                img.alt = logoId;
+                                // Intentar cargar imagen local en carpeta 'logos' primero PNG, luego SVG; si falla, placeholder
+                                img.src = `logos/${logoId}.png`;
+                                img._triedSvg = false;
+                                img.onerror = function(){
+                                    if(!this._triedSvg){
+                                        this._triedSvg = true;
+                                        this.src = `logos/${logoId}.svg`;
+                                    } else {
+                                        this.src = makePlaceholderSVGDataURL(logoId);
+                                    }
+                                };
+                                row.appendChild(img);
+                            }
+
+                            // posición (se actualizará después de ordenar)
+                            const pos = document.createElement('div');
+                            pos.className = 'position';
+                            pos.textContent = '';
+
+                            // input de nombre (editable)
+                            const nameInput = document.createElement('input');
+                            nameInput.type = 'text';
+                            nameInput.id = `${className}-name-${i}`;
+                            nameInput.className = `${className}-name`;
+                            nameInput.placeholder = `${prefix} ${i}`;
+                            nameInput.value = `${prefix} ${i}`;
+
+                            // input de puntos (numérico)
+                            const ptsInput = document.createElement('input');
+                            ptsInput.type = 'number';
+                            ptsInput.min = '0';
+                            ptsInput.step = '1';
+                            ptsInput.id = `${className}-${i}`;
+                            ptsInput.className = className;
+                            ptsInput.placeholder = '0';
+
+                            // control de campeón (checkbox) - solo uno por categoría
+                            const champ = document.createElement('input');
+                            champ.type = 'checkbox';
+                            champ.className = `${className}-champ`;
+                            champ.title = 'Marcar como campeón';
+                            champ.style.marginLeft = '8px';
+
+                            // eventos
+                            ptsInput.addEventListener('input', function(){ updateTotals(); saveState(); });
+                            nameInput.addEventListener('input', saveState);
+
+                            champ.addEventListener('change', function(){
+                                if(this.checked){
+                                    // desmarcar otros y ocultar sus badges
+                                    document.querySelectorAll(`input.${className}-champ`).forEach(c=>{
+                                        if(c!==this){ c.checked = false; const r = c.closest && c.closest('.row'); if(r) r.classList.remove('champion'); const b = r && r.querySelector('.champion-badge'); if(b) b.style.display='none'; }
+                                    });
+                                    // marcar fila actual
+                                    row.classList.add('champion');
+                                    badge.style.display = 'inline-block';
+                                } else {
+                                    row.classList.remove('champion');
+                                    badge.style.display = 'none';
+                                }
+                                saveState();
+                            });
+
+                            row.appendChild(pos);
+                            row.appendChild(nameInput);
+                            row.appendChild(ptsInput);
+                            row.appendChild(champ);
+                            // badge visual pequeño
+                            const badge = document.createElement('span');
+                            badge.className = 'champion-badge';
+                            badge.textContent = 'CAMPEÓN';
+                            badge.style.display = 'none';
+                            row.appendChild(badge);
+
+                            // sincronizar visual (muestra badge si champion checked)
+                            champ.addEventListener('change', function(){ badge.style.display = this.checked ? 'inline-block' : 'none'; });
+                            container.appendChild(row);
+                        }
+                    }
+
+                    // Colores por equipo (opcional)
+                    const TEAM_COLORS = {
+                        'ferrari': '#DC0000', // rojo Ferrari
+                        'mclaren': '#FF8700',
+                        'red-bull': '#1E41FF',
+                        'racing-bull': '#1E41FF',
+                        'aston-martin': '#235A3D',
+                        'mercedes': '#00D2BE',
+                        'alpine': '#0052B4',
+                        'hass': '#000000',
+                        'cadillac': '#8B0000',
+                        'audi': '#BB0A11',
+                        'williams': '#005AFF'
+                    };
+
+                    // Genera un data URL SVG simple con texto (fallback cuando el archivo no existe)
+                    function makePlaceholderSVGDataURL(id){
+                        const label = id.replace(/[-_]/g,' ').toUpperCase();
+                        const color = TEAM_COLORS[id] || '#EEEEEE';
+                        const textColor = getContrastYIQ(color);
+                        const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='160' height='100'>`+
+                                    `<rect width='100%' height='100%' fill='${color}' rx='6' />`+
+                                    `<text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='Segoe UI, Arial' font-size='14' fill='${textColor}'>${label}</text>`+
+                                    `</svg>`;
+                        return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
+                    }
+
+                    // Determina si el color de fondo necesita texto claro u oscuro
+                    function getContrastYIQ(hexcolor){
+                        const c = hexcolor.replace('#','');
+                        const r = parseInt(c.substr(0,2),16);
+                        const g = parseInt(c.substr(2,2),16);
+                        const b = parseInt(c.substr(4,2),16);
+                        const yiq = ((r*299)+(g*587)+(b*114))/1000;
+                        return (yiq >= 128) ? '#111' : '#fff';
+                    }
+
+            function sumValues(selector){
+                const els = document.querySelectorAll(selector);
+                let s = 0;
+                els.forEach(e => {
+                    const v = parseFloat(e.value);
+                    if(!Number.isNaN(v)) s += v;
+                });
+                return s;
+            }
+
+            function sortRows(containerId, pointClass, nameClass){
+                const container = document.getElementById(containerId);
+                if(!container) return;
+                const rows = Array.from(container.querySelectorAll('.row'));
+                rows.sort((a,b)=>{
+                    const pa = parseFloat(a.querySelector(`input.${pointClass}`)?.value) || 0;
+                    const pb = parseFloat(b.querySelector(`input.${pointClass}`)?.value) || 0;
+                    if(pb !== pa) return pb - pa; // descendente por puntos
+                    const na = (a.querySelector(`input.${nameClass}`)?.value || '').toLowerCase();
+                    const nb = (b.querySelector(`input.${nameClass}`)?.value || '').toLowerCase();
+                    return na.localeCompare(nb);
+                });
+                rows.forEach(r => container.appendChild(r));
+            }
+
+            function updateTotals(){
+                // Calcula totales internamente pero NO los muestra en la interfaz
+                const totalPilotos = sumValues('.piloto');
+                const totalConstructores = sumValues('.constructor');
+                // Reordenar visualmente por puntos (mayor arriba)
+                sortRows('pilotos-inputs','piloto','piloto-name');
+                sortRows('constructores-inputs','constructor','constructor-name');
+                updatePositions('pilotos-inputs');
+                updatePositions('constructores-inputs');
+                return { totalPilotos, totalConstructores };
+            }
+
+            function resetSelector(selector){
+                document.querySelectorAll(selector).forEach(e => e.value = '');
+                updateTotals();
+            }
+
+            function updatePositions(containerId){
+                const container = document.getElementById(containerId);
+                if(!container) return;
+                container.querySelectorAll('.row').forEach((row, idx)=>{
+                    const pos = row.querySelector('.position');
+                    if(pos) pos.textContent = `${idx+1}`;
+                });
+            }
+
+            function resetChampions(containerSelector){
+                document.querySelectorAll(containerSelector + ' .row').forEach(row=>{
+                    const champ = row.querySelector('input[type=checkbox]');
+                    if(champ){ champ.checked = false; }
+                    row.classList.remove('champion');
+                    const badge = row.querySelector('.champion-badge'); if(badge) badge.style.display = 'none';
+                });
+            }
+
+            function saveState(){
+                try{
+                    const state = { pilotos: [], constructores: [] };
+                    document.querySelectorAll('#pilotos-inputs .row').forEach(row=>{
+                        const name = row.querySelector('input.piloto-name')?.value || '';
+                        const pts = row.querySelector('input.piloto')?.value || '';
+                        const champ = !!row.querySelector('input.piloto-champ')?.checked;
+                        state.pilotos.push({ name, pts, champ });
+                    });
+                    document.querySelectorAll('#constructores-inputs .row').forEach(row=>{
+                        const name = row.querySelector('input.constructor-name')?.value || '';
+                        const pts = row.querySelector('input.constructor')?.value || '';
+                        const champ = !!row.querySelector('input.constructor-champ')?.checked;
+                        state.constructores.push({ name, pts, champ });
+                    });
+                    localStorage.setItem('sumador_state_v1', JSON.stringify(state));
+                }catch(e){ console.error('saveState failed', e); }
+            }
+
+            function loadState(){
+                try{
+                    const raw = localStorage.getItem('sumador_state_v1');
+                    if(!raw) return;
+                    const state = JSON.parse(raw);
+                    if(state.pilotos && Array.isArray(state.pilotos)){
+                        state.pilotos.forEach((p, idx)=>{
+                            const row = document.querySelector(`#pilotos-inputs .row:nth-child(${idx+1})`);
+                            if(!row) return;
+                            const nameEl = row.querySelector('input.piloto-name'); if(nameEl) nameEl.value = p.name || nameEl.placeholder;
+                            const ptsEl = row.querySelector('input.piloto'); if(ptsEl) ptsEl.value = p.pts || '';
+                            const champEl = row.querySelector('input.piloto-champ'); if(champEl){ champEl.checked = !!p.champ; const badge = row.querySelector('.champion-badge'); if(champEl.checked){ row.classList.add('champion'); if(badge) badge.style.display='inline-block'; } }
+                        });
+                    }
+                    if(state.constructores && Array.isArray(state.constructores)){
+                        state.constructores.forEach((c, idx)=>{
+                            const row = document.querySelector(`#constructores-inputs .row:nth-child(${idx+1})`);
+                            if(!row) return;
+                            const nameEl = row.querySelector('input.constructor-name'); if(nameEl) nameEl.value = c.name || nameEl.placeholder;
+                            const ptsEl = row.querySelector('input.constructor'); if(ptsEl) ptsEl.value = c.pts || '';
+                            const champEl = row.querySelector('input.constructor-champ'); if(champEl){ champEl.checked = !!c.champ; const badge = row.querySelector('.champion-badge'); if(champEl.checked){ row.classList.add('champion'); if(badge) badge.style.display='inline-block'; } }
+                        });
+                    }
+                }catch(e){ console.error('loadState failed', e); }
+            }
+
+            function autoChampion(containerId){
+                const container = document.getElementById(containerId);
+                if(!container) return;
+                let bestRow = null; let bestPts = -Infinity;
+                container.querySelectorAll('.row').forEach(row=>{
+                    const pts = parseFloat(row.querySelector('input[type=number]')?.value) || 0;
+                    if(pts > bestPts){ bestPts = pts; bestRow = row; }
+                });
+                if(bestRow){
+                    // desmarcar todos
+                    container.querySelectorAll('.row').forEach(r=>{ const ch = r.querySelector('input[type=checkbox]'); if(ch) ch.checked = false; r.classList.remove('champion'); const b = r.querySelector('.champion-badge'); if(b) b.style.display='none'; });
+                    const ch = bestRow.querySelector('input[type=checkbox]'); if(ch){ ch.checked = true; bestRow.classList.add('champion'); const b = bestRow.querySelector('.champion-badge'); if(b) b.style.display='inline-block'; }
+                    saveState();
+                }
+            }
+
+            // Inicialización con manejo de errores
+            try{
+                createInputs('pilotos-inputs','Piloto',NUM_PILOTOS,'piloto');
+
+                // Identificadores para logos de constructores (usa estos nombres como archivos logos/{id}.png)
+                const CONSTRUCTOR_LOGOS = [
+                    'mclaren',
+                    'red-bull',
+                    'racing-bull',
+                    'aston-martin',
+                    'mercedes',
+                    'alpine',
+                    'hass',
+                    'cadillac',
+                    'audi',
+                    'williams',
+                    'ferrari'
+                ];
+
+                createInputs('constructores-inputs','Constructor',NUM_CONSTRUCTORES,'constructor', CONSTRUCTOR_LOGOS);
+                // cargar estado guardado (si existe)
+                loadState();
+                updateTotals();
+                // actualizar posiciones iniciales
+                updatePositions('pilotos-inputs');
+                updatePositions('constructores-inputs');
+
+                // Generar calendario de 25 Grand Prix
+                const grandPrix = [
+                    'Australia', 'Malasia', 'China', 'Japón', 'Bahréin',
+                    'Arabia Saudita', 'Barhoust', 'Miami', 'Emilia-Romaña', 'Mónaco',
+                    'España', 'Canadá', 'Austria', 'Gran Bretaña', 'Bélgica',
+                    'Hungría', 'Países Bajos', 'Italia', 'Azerbaiyán', 'Singapur',
+                    'USA', 'México', 'Brasil', 'Las Vegas', 'Qatar', 'Abu Dhabi'
+                ];
+                const calendarTbody = document.getElementById('calendar-tbody');
+                grandPrix.forEach((gp, idx) => {
+                    const row = document.createElement('tr');
+                    row.style.borderBottom = '1px solid rgba(255,255,255,0.1)';
+                    row.innerHTML = `
+                        <td style="border:1px solid rgba(255,255,255,0.2);padding:8px;color:#ddd">${idx+1}</td>
+                        <td style="border:1px solid rgba(255,255,255,0.2);padding:8px"><strong>${gp}</strong></td>
+                        <td style="border:1px solid rgba(255,255,255,0.2);padding:8px;text-align:center">
+                            <input type="text" placeholder="DD/MM/YY" style="width:80px;padding:4px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:4px;color:#fff;text-align:center">
+                        </td>
+                        <td style="border:1px solid rgba(255,255,255,0.2);padding:8px;text-align:center">
+                            <input type="text" placeholder="Piloto" style="width:80px;padding:4px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:4px;color:#fff">
+                        </td>
+                    `;
+                    calendarTbody.appendChild(row);
+                });
+            }catch(err){
+                showDebug('Fallo al inicializar: ' + (err && err.message ? err.message : err));
+            }
+
+            // Botones
+            document.getElementById('reset-pilotos')?.addEventListener('click', ()=> { resetSelector('.piloto'); saveState(); });
+            document.getElementById('reset-constructores')?.addEventListener('click', ()=> { resetSelector('.constructor'); saveState(); });
+            document.getElementById('reset-todo')?.addEventListener('click', ()=>{ resetSelector('.piloto'); resetSelector('.constructor'); resetChampions('#pilotos-inputs'); resetChampions('#constructores-inputs'); localStorage.removeItem('sumador_state_v1'); });
+
+            document.getElementById('auto-champion-pilotos')?.addEventListener('click', ()=> autoChampion('pilotos-inputs'));
+            document.getElementById('auto-champion-constructores')?.addEventListener('click', ()=> autoChampion('constructores-inputs'));
+
+            document.getElementById('copiar-resultados')?.addEventListener('click', ()=>{
+                        // Construir detalle con nombres y puntos (orden visual actual)
+                        let detalles = '';
+                        detalles += 'Pilotos:\n';
+                        document.querySelectorAll('#pilotos-inputs .row').forEach((row, idx)=>{
+                            const nameEl = row.querySelector('input.piloto-name');
+                            const ptsEl = row.querySelector('input.piloto');
+                            const champEl = row.querySelector('input.piloto-champ');
+                            const name = nameEl?.value || nameEl?.placeholder || `Piloto ${idx+1}`;
+                            const pts = ptsEl?.value || '0';
+                            detalles += `${idx+1}. ${name} ${champEl && champEl.checked ? '(CAMPEÓN)' : ''} - ${pts}\n`;
+                        });
+
+                        detalles += '\nConstructores:\n';
+                        document.querySelectorAll('#constructores-inputs .row').forEach((row, idx)=>{
+                            const nameEl = row.querySelector('input.constructor-name');
+                            const ptsEl = row.querySelector('input.constructor');
+                            const champEl = row.querySelector('input.constructor-champ');
+                            const name = nameEl?.value || nameEl?.placeholder || `Constructor ${idx+1}`;
+                            const pts = ptsEl?.value || '0';
+                            detalles += `${idx+1}. ${name} ${champEl && champEl.checked ? '(CAMPEÓN)' : ''} - ${pts}\n`;
+                        });
+
+                        navigator.clipboard?.writeText(detalles).then(()=>{
+                            alert('Listado copiado al portapapeles');
+                        }).catch(()=>{
+                            // fallback
+                            window.prompt('Copia el listado manualmente:', detalles);
+                        });
+                    });
+
+            // Atajo: al presionar Enter en cualquier input se mueve al siguiente
+            document.addEventListener('keydown', (e)=>{
+                if(e.key === 'Enter'){
+                    const active = document.activeElement;
+                    if(active && (active.classList.contains('piloto') || active.classList.contains('constructor'))){
+                        e.preventDefault();
+                        const selector = active.classList.contains('piloto') ? '.piloto' : '.constructor';
+                        const list = Array.from(document.querySelectorAll(selector));
+                        const idx = list.indexOf(active);
+                        if(idx >=0 && idx < list.length-1) list[idx+1].focus();
+                    }
+                }
+            });
+        </script>
+        <script>
+            // Registrar el service worker para habilitar PWA
+            if('serviceWorker' in navigator){
+                window.addEventListener('load', function(){
+                    navigator.serviceWorker.register('/sw.js').then(reg=>{
+                        console.log('ServiceWorker registrado', reg.scope);
+
+                        // Si ya hay un service worker esperando, notifica al usuario
+                        if(reg.waiting){
+                            showUpdateToast();
+                        }
+
+                        // Cuando hay una nueva instalación en progreso
+                        reg.addEventListener && reg.addEventListener('updatefound', ()=>{
+                            const newWorker = reg.installing;
+                            newWorker && newWorker.addEventListener('statechange', ()=>{
+                                if(newWorker.state === 'installed' && navigator.serviceWorker.controller){
+                                    // nuevo SW instalado y controlador presente -> muestra notificación
+                                    showUpdateToast();
+                                }
+                            });
+                        });
+
+                        // Escuchar mensajes del SW
+                        navigator.serviceWorker.addEventListener('message', ev => {
+                            if(ev.data && ev.data.type === 'SW_UPDATED'){
+                                showUpdateToast();
+                            }
+                        });
+                    }).catch(err=>console.warn('ServiceWorker fallo', err));
+                });
+            }
+
+            // Muestra el toast de actualización
+            function showUpdateToast(){
+                const t = document.getElementById('update-toast');
+                if(!t) return;
+                t.style.display = 'flex';
+            }
+
+            // Al pulsar recargar, pide al SW que haga skipWaiting y espera al cambio de controller para recargar
+            document.addEventListener('click', (e)=>{
+                if(e.target && e.target.id === 'update-reload'){
+                    const reg = navigator.serviceWorker && navigator.serviceWorker.getRegistration();
+                    if(reg){
+                        reg.then(r => {
+                            if(r.waiting){
+                                // enviar mensaje al SW para saltar espera
+                                r.waiting.postMessage('skipWaiting');
+                            }
+                        });
+                    }
+                }
+            });
+
+            // Recargar cuando el nuevo SW toma control
+            if('serviceWorker' in navigator){
+                navigator.serviceWorker.addEventListener('controllerchange', ()=>{
+                    window.location.reload();
+                });
+            }
+        </script>
+    </body>
+</html>

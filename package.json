@@ -1,0 +1,15 @@
+{
+  "name": "fxracer-sumador",
+  "version": "1.0.0",
+  "description": "Sumador de puntos (Pilotos y Constructores) - PWA y empaquetado Electron",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-packager . fxracer --platform=win32 --arch=x64 --out=dist --overwrite",
+    "build": "electron-packager . fxracer --platform=win32 --arch=ia32 --out=dist --overwrite"
+  },
+  "devDependencies": {
+    "electron": "^30.0.0",
+    "electron-packager": "^17.1.0"
+  }
+}
