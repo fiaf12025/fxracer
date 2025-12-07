@@ -48,6 +48,19 @@
             button.secondary{background:#666;border-color:#444}
             footer{margin-top:20px;font-size:13px;color:#555}
             @media(max-width:720px){.container{grid-template-columns:1fr}.inputs{grid-template-columns:1fr}}
+            /* Sidebar / ranking styles */
+            #sidebar-pilotos .sidebar-row{display:flex;align-items:center;justify-content:space-between;padding:8px 6px;border-radius:6px;margin-bottom:6px;background:rgba(255,255,255,0.02)}
+            #sidebar-pilotos .pilot-left{display:flex;align-items:center;gap:10px}
+            .pilot-pos{width:28px;text-align:center;font-weight:700;color:#fff}
+            .pilot-pill{background:rgba(255,255,255,0.04);padding:6px 8px;border-radius:999px;font-weight:700;min-width:120px;text-align:left;color:#fff}
+            .pilot-points{min-width:68px;text-align:right;font-weight:700}
+            .pilot-progress{height:6px;background:rgba(255,255,255,0.06);border-radius:4px;overflow:hidden;margin-top:6px}
+            .pilot-progress > i{display:block;height:100%;border-radius:4px}
+            @media(max-width:900px){
+                /* stack under calendar on small screens */
+                section > aside.card{width:100%!important;max-width:none;margin-top:12px}
+                section > div.card{width:100%!important}
+            }
         </style>
     </head>
     <body>
@@ -91,22 +104,39 @@
             </div>
         </div>
 
-        <!-- Sección Calendario de 25 Grand Prix -->
-        <section class="card" style="margin-top:20px">
-            <h2>Calendario 2025 (25 Grand Prix)</h2>
-            <table style="width:100%;border-collapse:collapse;font-size:14px">
-                <thead>
-                    <tr style="background:rgba(255,255,255,0.1)">
-                        <th style="border:1px solid rgba(255,255,255,0.2);padding:8px;text-align:left">Posición</th>
-                        <th style="border:1px solid rgba(255,255,255,0.2);padding:8px;text-align:left">Gran Premio</th>
-                        <th style="border:1px solid rgba(255,255,255,0.2);padding:8px;text-align:center;width:120px">Fecha</th>
-                        <th style="border:1px solid rgba(255,255,255,0.2);padding:8px;text-align:center;width:80px">Ganador</th>
-                    </tr>
-                </thead>
-                <tbody id="calendar-tbody">
-                    <!-- Las filas se generarán con JavaScript -->
-                </tbody>
-            </table>
+        <!-- Calendario + Panel lateral: lado a lado en pantallas grandes -->
+        <section style="margin-top:18px;display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
+            <!-- Calendario (flexible) -->
+            <div class="card" style="flex:1;min-width:360px;max-width:900px">
+                <h2>Calendario 2025 (25 Grand Prix)</h2>
+                
+                <table style="width:100%;border-collapse:collapse;font-size:14px">
+                    <thead>
+                        <tr style="background:rgba(255,255,255,0.1)">
+                            <th style="border:1px solid rgba(255,255,255,0.2);padding:8px;text-align:left">Posición</th>
+                            <th style="border:1px solid rgba(255,255,255,0.2);padding:8px;text-align:left">Gran Premio</th>
+                            <th style="border:1px solid rgba(255,255,255,0.2);padding:8px;text-align:center;width:120px">Fecha</th>
+                            <th style="border:1px solid rgba(255,255,255,0.2);padding:8px;text-align:center;width:80px">Ganador</th>
+                        </tr>
+                    </thead>
+                    <tbody id="calendar-tbody">
+                        <!-- Las filas se generarán con JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Panel lateral de clasificación y gráfico -->
+            <aside class="card" style="width:320px;min-width:260px;flex-shrink:0;text-align:center">
+                <h3>Clasificación - Pilotos</h3>
+                <div id="sidebar-pilotos" style="display:flex;flex-direction:column;gap:6px;max-height:360px;overflow:auto;padding:6px"> 
+                    <!-- filas de pilotos se generan aquí -->
+                </div>
+                <hr style="border-color:rgba(255,255,255,0.06);margin:12px 0">
+                <h3>Reparto de Puntos</h3>
+                <div style="font-size:18px;font-weight:700;margin:8px 0" id="total-points">Puntos Totales: 0 Pts</div>
+                <canvas id="points-pie" width="280" height="180" style="max-width:100%"></canvas>
+                <div id="pie-legend" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:8px;font-size:12px"></div>
+            </aside>
         </section>
 
         <!-- Update toast (hidden by default) -->
@@ -295,7 +325,7 @@
             }
 
             function updateTotals(){
-                // Calcula totales internamente pero NO los muestra en la interfaz
+                // Calcula totales internamente
                 const totalPilotos = sumValues('.piloto');
                 const totalConstructores = sumValues('.constructor');
                 // Reordenar visualmente por puntos (mayor arriba)
@@ -303,6 +333,11 @@
                 sortRows('constructores-inputs','constructor','constructor-name');
                 updatePositions('pilotos-inputs');
                 updatePositions('constructores-inputs');
+                // Actualizar indicador de totales en el sidebar
+                const tp = document.getElementById('total-points');
+                if(tp) tp.textContent = `Puntos Totales: ${totalPilotos} Pts`;
+                // Renderizar listado lateral y gráfico
+                try{ renderSidebarAndPie(); }catch(e){ /* ignore if not yet ready */ }
                 return { totalPilotos, totalConstructores };
             }
 
@@ -374,6 +409,88 @@
                 }catch(e){ console.error('loadState failed', e); }
             }
 
+            // Render sidebar list of pilots and pie chart of points
+            function renderSidebarAndPie(){
+                const rows = Array.from(document.querySelectorAll('#pilotos-inputs .row'));
+                const sidebar = document.getElementById('sidebar-pilotos');
+                if(!sidebar) return;
+                // Build array of {name,pts}
+                const items = rows.map(r=>{
+                    const name = r.querySelector('input.piloto-name')?.value || r.querySelector('input.piloto-name')?.placeholder || 'Piloto';
+                    const pts = parseFloat(r.querySelector('input.piloto')?.value) || 0;
+                    return { name, pts };
+                });
+                // Ensure sorted visually matches rows order
+                // Clear and populate sidebar
+                sidebar.innerHTML = '';
+                let total = 0;
+                items.forEach((it, idx)=> total += it.pts);
+                items.forEach((it, idx)=>{
+                    const row = document.createElement('div');
+                    row.className = 'sidebar-row';
+                    const left = document.createElement('div'); left.className = 'pilot-left';
+                    const pos = document.createElement('div'); pos.className = 'pilot-pos'; pos.textContent = `${idx+1}`;
+                    const pillWrap = document.createElement('div'); pillWrap.style.display='flex'; pillWrap.style.flexDirection='column';
+                    const pill = document.createElement('div'); pill.className = 'pilot-pill'; pill.textContent = it.name;
+                    const prog = document.createElement('div'); prog.className = 'pilot-progress';
+                    const pct = total>0 ? Math.round((it.pts/total)*100) : 0;
+                    const bar = document.createElement('i'); bar.style.width = pct + '%'; bar.style.background = colorForIndex(idx);
+                    prog.appendChild(bar);
+                    pillWrap.appendChild(pill); pillWrap.appendChild(prog);
+                    left.appendChild(pos); left.appendChild(pillWrap);
+                    const right = document.createElement('div'); right.className = 'pilot-points'; right.textContent = `${it.pts} pts`;
+                    row.appendChild(left); row.appendChild(right);
+                    sidebar.appendChild(row);
+                });
+                // Draw donut chart
+                drawPointsDonut(items, total);
+            }
+
+            function drawPointsDonut(items, total){
+                const canvas = document.getElementById('points-pie');
+                const legend = document.getElementById('pie-legend');
+                if(!canvas) return;
+                const ctx = canvas.getContext('2d');
+                // clear
+                ctx.clearRect(0,0,canvas.width,canvas.height);
+                if(legend) legend.innerHTML = '';
+                if(total <= 0){
+                    ctx.fillStyle = 'rgba(255,255,255,0.03)'; ctx.fillRect(0,0,canvas.width,canvas.height);
+                    return;
+                }
+                const cx = canvas.width/2, cy = canvas.height/2; const radius = Math.min(canvas.width, canvas.height)/2 - 8;
+                let start = -0.5 * Math.PI;
+                items.forEach((it, idx)=>{
+                    if(it.pts <= 0) return;
+                    const slice = (it.pts/total) * Math.PI * 2;
+                    const color = colorForIndex(idx);
+                    ctx.beginPath();
+                    ctx.moveTo(cx, cy);
+                    ctx.arc(cx, cy, radius, start, start + slice);
+                    ctx.closePath();
+                    ctx.fillStyle = color; ctx.fill();
+                    start += slice;
+                    if(legend){
+                        const lg = document.createElement('div'); lg.style.display='flex'; lg.style.alignItems='center'; lg.style.gap='6px'; lg.style.margin='2px 6px';
+                        const dot = document.createElement('span'); dot.style.width='12px'; dot.style.height='12px'; dot.style.borderRadius='6px'; dot.style.display='inline-block'; dot.style.background = color;
+                        const label = document.createElement('span'); label.textContent = `${it.name} (${Math.round((it.pts/total)*100)}%)`;
+                        lg.appendChild(dot); lg.appendChild(label);
+                        legend.appendChild(lg);
+                    }
+                });
+                // draw inner circle to make donut
+                ctx.beginPath(); ctx.fillStyle = '#0b0b0b'; ctx.arc(cx, cy, radius*0.54, 0, Math.PI*2); ctx.fill();
+                // center text total
+                ctx.fillStyle = '#fff'; ctx.font = 'bold 14px Segoe UI, Arial'; ctx.textAlign='center'; ctx.fillText(total + ' pts', cx, cy + 5);
+            }
+
+            function colorForIndex(i){
+                const hue = (i * 47) % 360; // spread
+                return `hsl(${hue} 80% 55%)`;
+            }
+
+            
+
             function autoChampion(containerId){
                 const container = document.getElementById(containerId);
                 if(!container) return;
@@ -441,6 +558,8 @@
                     `;
                     calendarTbody.appendChild(row);
                 });
+
+                
             }catch(err){
                 showDebug('Fallo al inicializar: ' + (err && err.message ? err.message : err));
             }
